@@ -113,3 +113,9 @@ def prever_views(dados: SugestaoPost):
     except Exception as e:
         print(f"Erro: {e}")
         return {"views_estimadas": views_base, "feedback": "Análise matemática.", "sugestoes": []}
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    # O Render define a variável PORT automaticamente
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run(app, host="0.0.0.0", port=port)
