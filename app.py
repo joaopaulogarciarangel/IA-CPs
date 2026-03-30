@@ -1,12 +1,18 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 from fastapi.middleware.cors import CORSMiddleware
-import google.generativeai as genai
+from google import genai
+from google.genai import types
+from dotenv import load_dotenv
 import joblib
 import pandas as pd
 import numpy as np
 import json
 import re
+import os
+
+# Carrega as variáveis do arquivo .env (esconde a chave da API)
+load_dotenv()
 
 app = FastAPI(title="IA Híbrida - UFRJ Consulting Club")
 
@@ -19,16 +25,12 @@ app.add_middleware(
 )
 
 # 1. CONFIGURAÇÃO DA IA GENERATIVA (O Juiz Semântico)
-genai.configure(api_key="AIzaSyAM-LwazhRTEXJNMOx__9JJI3nIvmKIQsw")
-
-modelo_ideal = None
-for m in genai.list_models():
-    if 'generateContent' in m.supported_generation_methods:
-        if 'flash' in m.name:
-            modelo_ideal = m.name
-            break
-        modelo_ideal = m.name
-modelo_gemini = genai.GenerativeModel(modelo_ideal)
+# A nova biblioteca pega automaticamente a variável GEMINI_API_KEY do ambiente
+try:
+    client = genai.Client()
+    print("✅ Google GenAI configurado com sucesso!")
+except Exception as e:
+    print(f"❌ Erro ao configurar Google GenAI: {e}. Verifique sua GEMINI_API_KEY.")
 
 # 2. CONFIGURAÇÃO DO MACHINE LEARNING (A Realidade do Clube)
 try:
@@ -91,7 +93,12 @@ def prever_views(dados: SugestaoPost):
     """
     
     try:
-        resposta = modelo_gemini.generate_content(prompt)
+        # Nova sintaxe da biblioteca google-genai
+        resposta = client.models.generate_content(
+            model='gemini-2.5-flash',
+            contents=prompt,
+        )
+        
         match = re.search(r'\{.*\}', resposta.text, re.DOTALL)
         
         if match:
@@ -108,14 +115,14 @@ def prever_views(dados: SugestaoPost):
                 "sugestoes": resultado_llm.get('sugestoes', [])
             }
         else:
-            return {"views_estimadas": views_base, "feedback": "Análise matemática.", "sugestoes": []}
+            return {"views_estimadas": views_base, "feedback": "Análise matemática (Erro no formato JSON da IA).", "sugestoes": []}
             
     except Exception as e:
-        print(f"Erro: {e}")
-        return {"views_estimadas": views_base, "feedback": "Análise matemática.", "sugestoes": []}
+        print(f"Erro na IA Generativa: {e}")
+        return {"views_estimadas": views_base, "feedback": "Análise matemática (IA Generativa indisponível).", "sugestoes": []}
+
 if __name__ == "__main__":
     import uvicorn
-    import os
     # O Render define a variável PORT automaticamente
     port = int(os.environ.get("PORT", 10000))
     uvicorn.run(app, host="0.0.0.0", port=port)
